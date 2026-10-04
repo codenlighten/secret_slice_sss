@@ -1,37 +1,30 @@
 {
-  "name": "sssa-js",
-  "version": "0.0.1",
-  "description": "Helper cryptography module for JavaScript",
-  "main": "sssa.js",
+  "name": "secretslices",
+  "version": "1.0.0",
+  "description": "Shamir secret sharing with verified recovery: split a secret into shares, recover it from any threshold of them. Zero dependencies; Node.js and browsers.",
+  "type": "module",
+  "exports": {
+    ".": { "types": "./types/index.d.ts", "default": "./src/index.js" },
+    "./legacy": { "types": "./types/legacy.d.ts", "default": "./src/legacy.js" },
+    "./legacy-password": { "types": "./types/legacy-password.d.ts", "default": "./src/legacy-password.js" },
+    "./mnemonic": { "types": "./types/mnemonic.d.ts", "default": "./src/mnemonic.js" },
+    "./package.json": "./package.json"
+  },
+  "types": "./types/index.d.ts",
+  "bin": { "secretslices": "src/cli.js" },
+  "files": ["src", "types", "docs", "web/index.html", "CHANGELOG.md", "SECURITY.md"],
+  "sideEffects": false,
   "scripts": {
-    "test": "node ./test/sssa.js"
+    "test": "node --test test/*.test.js test/*.test.cjs",
+    "build": "node scripts/build-web.mjs",
+    "test:browser": "node scripts/browser-check.mjs",
+    "prepack": "node scripts/build-web.mjs --check"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/SSSaaS/sssa-js.git"
-  },
-  "keywords": [
-    "javascript",
-    "sssa",
-    "shamir",
-    "secret",
-    "sharing",
-    "crypto"
-  ],
-  "author": "Alexander Scheel",
-  "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/SSSaaS/sssa-js/issues"
-  },
-  "homepage": "https://github.com/SSSaaS/sssa-js#readme",
-  "devDependencies": {
-    "browserify": "^12.0.1",
-    "uglify-js": "^2.6.0"
-  },
-  "dependencies": {
-    "big-integer": "^1.6.5",
-    "get-random-values": "^1.1.1",
-    "global": "^4.3.0",
-    "utf-8": "^1.0.0"
-  }
+  "engines": { "node": ">=20.19.0" },
+  "repository": { "type": "git", "url": "git+https://github.com/codenlighten/secret_slice_sss.git" },
+  "bugs": { "url": "https://github.com/codenlighten/secret_slice_sss/issues" },
+  "homepage": "https://secretslices.com",
+  "keywords": ["shamir", "secret-sharing", "sss", "threshold", "backup", "mnemonic", "bip39", "crypto"],
+  "author": "Gregory J. Ward <greg@smartledger.technology>",
+  "license": "MIT"
 }

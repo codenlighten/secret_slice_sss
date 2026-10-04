@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="<!--%CSP%-->">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta name="description" content="Split a secret into shares with Shamir's secret sharing. Any chosen number of them recover it; fewer reveal nothing. Runs entirely in your browser, offline.">
+<title>SecretSlices</title>
+<link rel="icon" href="data:,">
+<style>/*%STYLE%*/</style>
+</head>
+<body>
+<header>
+  <h1>Secret<span>Slices</span></h1>
+  <p class="tagline">Split a secret into shares. Any few of them bring it back; fewer reveal nothing.</p>
+  <p class="offline" id="offline">This page works offline and cannot send anything anywhere. <a href="#about">How do I know?</a></p>
+</header>
+
+<nav role="tablist" aria-label="What do you want to do?">
+  <button role="tab" id="tab-split" aria-controls="panel-split" aria-selected="true">Split a secret</button>
+  <button role="tab" id="tab-recover" aria-controls="panel-recover" aria-selected="false" tabindex="-1">Recover a secret</button>
+</nav>
+
+<main>
+<section role="tabpanel" id="panel-split" aria-labelledby="tab-split">
+  <form id="split-form" autocomplete="off">
+    <label for="secret">Secret</label>
+    <textarea id="secret" rows="3" spellcheck="false" autocapitalize="off" autocorrect="off" autocomplete="off" placeholder="A recovery phrase, a password, a private key…" required></textarea>
+    <div class="row">
+      <button type="button" class="quiet" id="generate">Generate a 12-word phrase</button>
+      <span class="hint" id="secret-hint" role="status"></span>
+    </div>
+
+    <div class="numbers">
+      <label>Create <input type="number" id="shares" min="2" max="255" value="3" required inputmode="numeric"> shares</label>
+      <label>Require <input type="number" id="threshold" min="2" max="255" value="2" required inputmode="numeric"> to recover</label>
+    </div>
+    <label class="check"><input type="checkbox" id="pad"> Hide the secret's length <span class="hint">(shares get longer)</span></label>
+    <p class="error" id="split-error" role="alert" hidden></p>
+    <button type="submit" class="primary">Split</button>
+  </form>
+
+  <div id="split-result" hidden>
+    <h2 id="split-summary" tabindex="-1"></h2>
+    <p id="split-advice">Give each share to a different person or place. Then close this page: the secret is not stored anywhere.</p>
+    <div class="row">
+      <button type="button" id="download-all">Download all</button>
+      <button type="button" id="print">Print</button>
+      <button type="button" class="quiet" id="clear-split">Clear everything</button>
+    </div>
+    <ol id="share-list"></ol>
+  </div>
+</section>
+
+<section role="tabpanel" id="panel-recover" aria-labelledby="tab-recover" hidden>
+  <form id="recover-form" autocomplete="off">
+    <label for="shares-in">Shares</label>
+    <textarea id="shares-in" rows="6" spellcheck="false" autocapitalize="off" autocorrect="off" autocomplete="off" placeholder="Paste shares here, one per line, in any order. Shares from older versions of SecretSlices work too."></textarea>
+    <div class="row">
+      <label class="file">Add share files <input type="file" id="files" multiple accept=".txt,.json,text/plain,application/json"></label>
+      <span class="hint">or drop them on the box</span>
+    </div>
+    <ul id="share-status" aria-live="polite"></ul>
+    <p class="error" id="recover-error" role="alert" hidden></p>
+    <button type="submit" class="primary">Recover</button>
+  </form>
+
+  <div id="recover-result" hidden>
+    <h2 id="recover-summary" tabindex="-1"></h2>
+    <p class="warning" id="recover-warning" hidden></p>
+    <pre id="recovered" class="secret"></pre>
+    <div class="row">
+      <button type="button" id="copy-secret">Copy</button>
+      <button type="button" class="quiet" id="clear-recover">Clear everything</button>
+    </div>
+    <form id="password-form" autocomplete="off" hidden>
+      <p>This secret was encrypted with a password before it was split.</p>
+      <label for="password">Password</label>
+      <div class="row">
+        <input type="password" id="password" autocomplete="off" required>
+        <button type="submit">Decrypt</button>
+      </div>
+      <p class="error" id="password-error" role="alert" hidden></p>
+    </form>
+  </div>
+</section>
+</main>
+
+<footer id="about">
+  <details>
+    <summary>How it works, and what to trust</summary>
+    <p>SecretSlices uses <strong>Shamir's secret sharing</strong>. Each share is a point on a random curve whose shape is the secret. With the required number of points the curve is known; with even one fewer, every possible secret is exactly as likely as before. That is a mathematical property, not an encryption that could be broken later.</p>
+    <p><strong>Recovery is checked.</strong> A share that was mistyped is reported by its number. If the shares do not fit together (one was changed, or belongs to a different secret), you get an error, never a wrong secret.</p>
+    <p><strong>Nothing leaves this page.</strong> It is a single file with no outside resources, and its security policy forbids every network request, so even a bug could not send your secret anywhere. For the highest assurance, save this page, disconnect from the network, and open the saved file.</p>
+    <p><strong>What it cannot do.</strong> Anyone holding the required number of shares can read the secret. Someone you give a share to can refuse to return it, so create more shares than you require. If one person hands you a complete set of shares, you are trusting that person: shares are not signed.</p>
+    <p>Shares made by earlier versions of SecretSlices can still be recovered here. New shares start with <code>ss1.</code></p>
+  </details>
+  <p class="small">SecretSlices <!--%VERSION%--> · open source, MIT licence · <a href="https://github.com/codenlighten/secret_slice_sss" rel="noopener noreferrer">source and format specification</a></p>
+</footer>
+
+<template id="share-template">
+  <li class="share">
+    <div class="share-head">
+      <strong class="share-title"></strong>
+      <span class="share-note"></span>
+    </div>
+    <code class="share-text"></code>
+    <div class="row share-actions">
+      <button type="button" class="copy">Copy</button>
+      <button type="button" class="download">Download</button>
+    </div>
+  </li>
+</template>
+<script>/*%SCRIPT%*/</script>
+</body>
+</html>
