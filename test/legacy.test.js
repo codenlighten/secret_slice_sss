@@ -85,6 +85,9 @@ test('nothing in pasted text is silently skipped', () => {
   assert.throws(() => recover(`${a}\nstray words\n${b}`), code('ERR_INVALID_SHARE'), 'text between the objects');
   assert.throws(() => recover(`${a}\n${b}\nss1.invalid`), SecretSlicesError);
   assert.equal(recover(`[${a},\n${b}`).text(), text, 'a JSON array missing its closing bracket');
+  const pair = split('nested', { shares: 2, threshold: 2 });
+  assert.equal(recover(`${pair[0]}\n${JSON.stringify({ share: pair[1], meta: { note: 'a } brace { in a "string"' } })}`).text(), 'nested', 'objects with nested fields');
+  assert.throws(() => recover(`${a}\n{"part": 2, "value": "1,2"`), code('ERR_INVALID_SHARE'), 'an object that never closes');
 });
 
 test('repeated legacy shares are ignored; conflicting ones are an error', () => {

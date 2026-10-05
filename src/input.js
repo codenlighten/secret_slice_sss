@@ -3,6 +3,23 @@
 
 import { fail } from './errors.js';
 
+// The index just past the JSON object that opens at `start`, or -1. Braces
+// inside strings do not count.
+function objectEnd(text, start) {
+  let depth = 0;
+  let inString = false;
+  for (let i = start; i < text.length; i++) {
+    const char = text[i];
+    if (inString) {
+      if (char === '\\') i++;
+      else if (char === '"') inString = false;
+    } else if (char === '"') inString = true;
+    else if (char === '{') depth++;
+    else if (char === '}' && --depth === 0) return i + 1;
+  }
+  return -1;
+}
+
 function fromText(text) {
   const trimmed = text.trim();
   if (trimmed === '') return [];
@@ -17,17 +34,38 @@ function fromText(text) {
   // pasted one after another) and bare shares, in any mixture. Everything in
   // the text must be accounted for; nothing is skipped.
   const items = [];
-  const bare = (segment) => items.push(...segment.split(/[\s,;"'[\]]+/).filter(Boolean));
+  // A share copied from paper is often typed with the gaps it was printed
+  // with, or wrapped over several lines. Every new-format share begins with
+  // "ss<version>.", and "." is not in the share alphabet, so a new share can
+  // only begin at such a prefix. Pieces after one that are made only of
+  // share characters are joined to it; if they were not in fact part of it,
+  // the share's checksum fails and the share is reported as damaged.
+  const bare = (segment) => {
+    let open = false;
+    for (const piece of segment.split(/[\s,;"'[\]]+/).filter(Boolean)) {
+      if (/^ss\d+\./.test(piece)) {
+        items.push(piece);
+        open = true;
+      } else if (open && /^[A-Za-z0-9_-]+$/.test(piece)) {
+        items[items.length - 1] += piece;
+      } else {
+        items.push(piece);
+        open = false;
+      }
+    }
+  };
   let position = 0;
-  for (const match of trimmed.matchAll(/\{[^{}]*\}/g)) {
-    bare(trimmed.slice(position, match.index));
+  for (let start = trimmed.indexOf('{'); start !== -1; start = trimmed.indexOf('{', position)) {
+    const end = objectEnd(trimmed, start);
+    bare(trimmed.slice(position, start));
     try {
-      items.push(...flatten(JSON.parse(match[0])));
+      if (end === -1) throw new SyntaxError('unterminated object');
+      items.push(...flatten(JSON.parse(trimmed.slice(start, end))));
     } catch (error) {
       if (!(error instanceof SyntaxError)) throw error;
       fail('ERR_INVALID_SHARE', 'the input contains JSON that could not be parsed');
     }
-    position = match.index + match[0].length;
+    position = end;
   }
   bare(trimmed.slice(position));
   return items;

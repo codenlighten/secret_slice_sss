@@ -63,7 +63,10 @@ export function encodeShare({ threshold, index, setId, body }) {
  */
 export function decodeShare(text) {
   if (typeof text !== 'string') fail('ERR_INVALID_SHARE', 'a share must be a string');
-  const trimmed = text.trim();
+  // Whitespace after the prefix carries no information: a share may be
+  // written in groups. The prefix itself must be intact.
+  const start = text.trim();
+  const trimmed = start.slice(0, PREFIX.length) + start.slice(PREFIX.length).replace(/\s+/g, '');
   if (!trimmed.startsWith(PREFIX)) {
     const other = /^ss(\d+)\./.exec(trimmed);
     if (other) {

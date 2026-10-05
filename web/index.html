@@ -2,108 +2,193 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-Ddgvq0Yk2dBr1p+8Vkxj4hSncNq41DLn+YogAX6R+XQ='; style-src 'sha256-9bJ65Gf7GYisRF+GeiqJekGfcWc9Cfk0BOEoRxXe2XE='; img-src data:; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-+sVc/xLixrrcpYCwrIlAfM0tFd1viEwUNvRR1nA6OGw='; style-src 'sha256-ye5dFfydTGz4bZZCczDH/1siN+sEMmY3Ccy10yLcReI='; img-src data:; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
 <meta name="description" content="Split a secret into shares with Shamir's secret sharing. Any chosen number of them recover it; fewer reveal nothing. Runs entirely in your browser, offline.">
 <title>SecretSlices</title>
 <link rel="icon" href="data:,">
 <style>:root {
-  --bg: #f6f5f1; --panel: #ffffff; --ink: #1d1d1b; --muted: #62625c; --line: #d9d7ce;
-  --accent: #1f6f5c; --accent-ink: #ffffff; --danger: #a4262c; --warn-bg: #fff4d6; --warn-ink: #5c4300;
+  --bg: #f6f5f1; --panel: #ffffff; --ink: #1d1d1b; --muted: #62625c; --line: #d9d7ce; --edge: #8a8980;
+  --accent: #1f6f5c; --accent-ink: #ffffff; --accent-soft: #e4f1ec; --danger: #a4262c; --warn-bg: #fff4d6; --warn-ink: #5c4300;
   --ok: #1f6f5c; --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
   color-scheme: light dark;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #151614; --panel: #1f201d; --ink: #ecebe6; --muted: #a3a29a; --line: #3a3b36;
-    --accent: #58c2a7; --accent-ink: #08221c; --danger: #ff8a8a; --warn-bg: #3d3210; --warn-ink: #ffe08a; --ok: #58c2a7;
+    --bg: #151614; --panel: #1f201d; --ink: #ecebe6; --muted: #a3a29a; --line: #3a3b36; --edge: #7d7e76;
+    --accent: #58c2a7; --accent-ink: #08221c; --accent-soft: #1d3a33; --danger: #ff8a8a; --warn-bg: #3d3210; --warn-ink: #ffe08a; --ok: #58c2a7;
   }
 }
 * { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; }
+/* `hidden` must win over any display set below, or a hidden grid or flex box would still show. */
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 body {
-  margin: 0 auto; padding: 24px 16px 48px; max-width: 720px;
+  margin: 0 auto; padding: 28px 16px 56px; max-width: 760px;
   background: var(--bg); color: var(--ink);
-  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font: 17px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
-h1 { margin: 0; font-size: 2rem; letter-spacing: -0.02em; }
+h1 { margin: 0; font-size: 2.1rem; letter-spacing: -0.02em; }
 h1 span { color: var(--accent); }
-h2 { font-size: 1.15rem; margin: 28px 0 4px; }
+h2 { font-size: 1.15rem; line-height: 1.35; margin: 0 0 10px; }
 h2:focus { outline: none; }
+h2 label { display: inline; font: inherit; margin: 0; }
 p { margin: 8px 0; }
-a { color: var(--accent); }
-.tagline { margin: 4px 0 0; font-size: 1.05rem; }
-.offline, .hint, .small, .share-note { color: var(--muted); font-size: 0.875rem; }
+a { color: var(--accent); padding-block: 4px; }
+.tagline { margin: 4px 0 0; font-size: 1.1rem; }
+.offline, .hint, .small, .share-note { color: var(--muted); font-size: 0.9rem; }
 .small { margin-top: 16px; }
+.vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.sheet { display: none; }
 
-nav { display: flex; gap: 4px; margin: 24px 0 0; border-bottom: 1px solid var(--line); }
-nav button {
-  border: 1px solid transparent; border-bottom: 0; border-radius: 8px 8px 0 0; background: none;
-  padding: 10px 16px; margin-bottom: -1px; color: var(--muted); font-weight: 600;
+/* The first question the page asks: which of two things are you here to do.
+   Two large choices, each saying it in the visitor's own words. */
+main { margin-top: 24px; }
+.modes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.modes button {
+  display: block; text-align: left; padding: 14px 16px; border-radius: 12px; border: 1px solid var(--line);
+  background: none; color: var(--muted); font-weight: 400;
 }
-nav button[aria-selected="true"] { background: var(--panel); border-color: var(--line); color: var(--ink); }
+.modes strong { display: block; font-size: 1.1rem; color: var(--ink); }
+.modes span { display: block; font-size: 0.9rem; }
+.modes button[aria-selected="true"] { background: var(--panel); border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.modes button[aria-selected="true"] strong { color: var(--accent); }
 
-main { background: var(--panel); border: 1px solid var(--line); border-top: 0; border-radius: 0 0 10px 10px; padding: 20px; }
+section[role="tabpanel"] { margin-top: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 22px; }
+
+/* One thing at a time, in the order it has to be done. */
+.step { margin: 0 0 26px; }
+.num {
+  display: inline-block; width: 1.7em; height: 1.7em; margin-right: 10px; border-radius: 50%;
+  background: var(--accent); color: var(--accent-ink); font-size: 0.9rem; line-height: 1.7em; text-align: center; vertical-align: 1px;
+}
 label { display: block; font-weight: 600; margin: 0 0 6px; }
 textarea, input[type="number"], input[type="password"] {
-  font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px;
+  font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--edge); border-radius: 8px; padding: 10px 12px;
 }
 textarea { display: block; width: 100%; resize: vertical; font-family: var(--mono); font-size: 0.95rem; overflow-wrap: anywhere; }
 textarea.dragging { border-color: var(--accent); border-style: dashed; }
-input[type="number"] { width: 5.2em; margin: 0 6px; text-align: center; }
-input[type="password"] { flex: 1 1 12em; min-width: 0; }
-.numbers { display: flex; flex-wrap: wrap; gap: 8px 28px; margin: 20px 0 12px; }
-.numbers label, .check { font-weight: 400; margin: 0; }
-.check { margin: 0 0 20px; }
-.check input { margin-right: 6px; }
+input[type="number"] { width: 5.2em; min-height: 44px; margin: 0 6px; text-align: center; }
+input[type="password"] { flex: 1 1 12em; min-width: 0; min-height: 44px; }
+.numbers { display: flex; flex-wrap: wrap; gap: 8px 28px; margin: 14px 0 12px; }
+.numbers label { font-weight: 400; margin: 0; }
+.check { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; min-height: 44px; font-weight: 400; margin: 6px 0 0; }
+.check input { width: 24px; height: 24px; margin: 0; accent-color: var(--accent); }
 .row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 10px 0; }
 
 button, .file {
   font: inherit; font-weight: 600; cursor: pointer; color: var(--ink); background: var(--panel);
-  border: 1px solid var(--line); border-radius: 8px; padding: 8px 14px; margin: 0;
+  border: 1px solid var(--edge); border-radius: 8px; padding: 8px 14px; margin: 0; min-height: 44px;
 }
 button:hover, .file:hover { border-color: var(--accent); }
-button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); padding: 10px 28px; font-size: 1.05rem; }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); padding: 10px 28px; font-size: 1.05rem; min-height: 48px; }
 button.quiet { background: none; border-color: transparent; color: var(--accent); padding-left: 0; padding-right: 0; }
 button.quiet:hover { text-decoration: underline; }
 :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
-.file { display: inline-block; }
+.file { display: inline-flex; align-items: center; }
 .file input { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .file:focus-within { outline: 3px solid var(--accent); outline-offset: 2px; }
 
+/* Common choices, and under them the plan in plain words: a row of dots,
+   one a share, the filled ones being how many it takes. */
+.presets { display: flex; flex-wrap: wrap; gap: 8px; }
+.preset { border-radius: 999px; padding: 6px 16px; }
+.preset[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--ink); }
+.plan { margin: 4px 0 8px; padding: 12px 14px; background: var(--bg); border-radius: 10px; }
+.plan p { margin: 0; }
+.plan.risky { background: var(--warn-bg); color: var(--warn-ink); }
+.dots { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 10px; }
+.dots:empty { display: none; }
+.dots i { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--accent); }
+.dots i.need { background: var(--accent); }
+
 .error { color: var(--danger); font-weight: 600; }
+/* The library's messages begin in lower case; shown, they begin a sentence. */
+.error::first-letter, #share-status li::first-letter { text-transform: uppercase; }
 .warning { background: var(--warn-bg); color: var(--warn-ink); border-radius: 8px; padding: 10px 12px; }
 .ok { color: var(--ok); }
 .bad { color: var(--danger); }
 
-#share-status { list-style: none; padding: 0; margin: 12px 0; font-size: 0.925rem; }
+/* Recovery: how many shares are in hand out of how many it takes, then what
+   to do next, in that order. */
+.meter { display: flex; gap: 6px; margin: 4px 0 10px; }
+.meter i { flex: 1 1 0; max-width: 64px; height: 12px; border-radius: 6px; border: 2px solid var(--accent); }
+.meter i.have { background: var(--accent); }
+#share-status { list-style: none; padding: 0; margin: 0 0 8px; }
 #share-status li { padding: 2px 0; }
-#share-list { list-style: none; padding: 0; margin: 16px 0 0; }
-.share { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin: 0 0 12px; }
-.share-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; }
+#share-status li.ok { font-weight: 600; }
+.next { margin: 0; padding: 10px 14px; background: var(--bg); border-radius: 10px; }
+.next.ready { background: var(--accent-soft); }
+.next.fix { background: var(--warn-bg); color: var(--warn-ink); }
+
+.recap { margin: 0 0 12px; color: var(--muted); }
+#recover-summary { color: var(--ok); font-size: 1.3rem; }
+.todo { margin: 8px 0 14px; padding-left: 1.4em; }
+.todo li { margin: 2px 0; }
+#share-list { list-style: none; padding: 0; margin: 18px 0 0; }
+.share { border: 1px solid var(--line); border-left: 6px solid var(--accent); border-radius: 10px; padding: 14px 16px; margin: 0 0 12px; }
+.share-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 12px; }
+.share-title { font-size: 1.05rem; }
 .share-text, .secret {
   display: block; margin: 8px 0 0; padding: 10px 12px; background: var(--bg); border-radius: 8px;
   font-family: var(--mono); font-size: 0.9rem; overflow-wrap: anywhere; white-space: pre-wrap; user-select: all;
 }
-.share-text { word-break: break-all;
-}
+/* A share is shown in groups of four so that an eye, or a finger on paper,
+   can keep its place. The groups are spans with a margin: there is no space
+   character between them, so the text copies as one unbroken share. */
+.share-text { white-space: normal; line-height: 1.9; word-break: break-all; }
+.share-text span { display: inline-block; margin-right: 0.6em; }
 .secret { border: 1px solid var(--line); font-size: 1rem; min-height: 2.6em; }
 .share-actions { margin-bottom: 0; }
 code { font-family: var(--mono); }
 
+/* A recovery phrase is easier to copy out correctly as numbered words. */
+.words { list-style: none; counter-reset: word; display: grid; grid-template-columns: repeat(auto-fill, minmax(8.5em, 1fr)); gap: 8px; margin: 10px 0 0; padding: 0; }
+.words li { counter-increment: word; padding: 8px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; font-family: var(--mono); }
+.words li::before { content: counter(word) "  "; color: var(--muted); font-size: 0.85rem; white-space: pre; }
+.words:not([hidden]) + .secret { display: none; }
+
 footer { margin-top: 28px; }
-summary { cursor: pointer; font-weight: 600; }
+summary { cursor: pointer; font-weight: 600; padding-block: 10px; }
 details p { color: var(--muted); }
 
+@media (max-width: 520px) {
+  body { padding: 20px 14px 48px; font-size: 16px; }
+  .modes { grid-template-columns: 1fr; }
+  section[role="tabpanel"] { padding: 16px; }
+  a { display: inline-block; padding-block: 12px; }
+  .offline a, .small a { margin-block: -8px; }
+  .row > button:not(.quiet), .row > .file { flex: 1 1 auto; justify-content: center; }
+  button.primary { width: 100%; }
+}
+
+@media (forced-colors: active) {
+  .num, .dots i.need, .meter i.have { background: CanvasText; forced-color-adjust: none; }
+  .modes button[aria-selected="true"] { border: 3px solid Highlight; }
+}
+
+/* On paper each share is a sheet of its own, to be handed to one person and
+   understood by whoever has to use it, perhaps years later, with nothing else
+   to go on. */
 @media print {
-  body { max-width: none; padding: 0; background: #fff; color: #000; }
-  header, nav, footer, form, #split-advice, #split-result > .row, .share-actions, #panel-recover { display: none !important; }
-  main { border: 0; padding: 0; }
-  #split-summary { font-size: 12pt; margin: 0 0 12pt; }
-  .share { border: 1pt solid #000; break-inside: avoid; margin-bottom: 14pt; }
-  .share-text { background: none; border: 0; padding: 6pt 0 0; font-size: 11pt; }
-  .share-note { color: #000; }
+  body { max-width: none; padding: 0; background: #fff; color: #000; font-size: 12pt; }
+  header, .modes, footer, form, #split-recap, #split-summary, #split-advice, #split-result > .row, .share-actions, #panel-recover, #say { display: none !important; }
+  section[role="tabpanel"] { border: 0; padding: 0; margin: 0; }
+  #share-list { margin: 0; }
+  .sheet { display: block; }
+  .share { border: 0; padding: 0; margin: 0; break-after: page; }
+  .share:last-child { break-after: auto; }
+  .share-head { display: block; border-bottom: 1.5pt solid #000; padding-bottom: 8pt; }
+  .share-title { display: block; font-size: 22pt; }
+  .share-note { color: #000; font-size: 11pt; }
+  .share-what { font-size: 13pt; margin: 14pt 0; }
+  .share-text { background: none; border: 1pt solid #000; border-radius: 0; padding: 12pt; font-size: 15pt; line-height: 2.1; }
+  .share-text span { margin-right: 0.9em; }
+  .sheet-title { font-weight: 700; margin: 18pt 0 4pt; }
+  .share-how { margin: 0; padding-left: 1.4em; }
+  .share-how li { margin: 4pt 0; }
+  .sheet-keep { margin-top: 14pt; }
 }
 </style>
 </head>
@@ -114,36 +199,56 @@ details p { color: var(--muted); }
   <p class="offline" id="offline">This page works offline and cannot send anything anywhere. <a href="#about">How do I know?</a></p>
 </header>
 
-<nav role="tablist" aria-label="What do you want to do?">
-  <button role="tab" id="tab-split" aria-controls="panel-split" aria-selected="true">Split a secret</button>
-  <button role="tab" id="tab-recover" aria-controls="panel-recover" aria-selected="false" tabindex="-1">Recover a secret</button>
-</nav>
-
 <main>
+<div class="modes" role="tablist" aria-label="What do you want to do?">
+  <button role="tab" id="tab-split" aria-controls="panel-split" aria-selected="true"><strong>Split a secret</strong><span>I have a secret to protect</span></button>
+  <button role="tab" id="tab-recover" aria-controls="panel-recover" aria-selected="false" tabindex="-1"><strong>Recover a secret</strong><span>I have shares and need the secret back</span></button>
+</div>
+
 <section role="tabpanel" id="panel-split" aria-labelledby="tab-split">
   <form id="split-form" autocomplete="off">
-    <label for="secret">Secret</label>
-    <textarea id="secret" rows="3" spellcheck="false" autocapitalize="off" autocorrect="off" autocomplete="off" placeholder="A recovery phrase, a password, a private key…" required></textarea>
-    <div class="row">
-      <button type="button" class="quiet" id="generate">Generate a 12-word phrase</button>
-      <span class="hint" id="secret-hint" role="status"></span>
+    <div class="step">
+      <h2><span class="num" aria-hidden="true">1</span><label for="secret">The secret</label></h2>
+      <textarea id="secret" rows="3" spellcheck="false" autocapitalize="off" autocorrect="off" autocomplete="off" placeholder="A recovery phrase, a password, a private key…" required></textarea>
+      <div class="row">
+        <button type="button" class="quiet" id="generate">Generate a 12-word phrase</button>
+        <span class="hint" id="secret-hint" role="status"></span>
+      </div>
     </div>
 
-    <div class="numbers">
-      <label>Create <input type="number" id="shares" min="2" max="255" value="3" required inputmode="numeric"> shares</label>
-      <label>Require <input type="number" id="threshold" min="2" max="255" value="2" required inputmode="numeric"> to recover</label>
+    <div class="step">
+      <h2 id="plan-title"><span class="num" aria-hidden="true">2</span>How many shares</h2>
+      <div class="presets" role="group" aria-label="Common choices">
+        <button type="button" class="preset" data-shares="3" data-threshold="2">2 of 3</button>
+        <button type="button" class="preset" data-shares="5" data-threshold="3">3 of 5</button>
+        <button type="button" class="preset" data-shares="7" data-threshold="4">4 of 7</button>
+      </div>
+      <div class="numbers">
+        <label>Make <input type="number" id="shares" min="2" max="255" value="3" required inputmode="numeric"> shares</label>
+        <label>Require <input type="number" id="threshold" min="2" max="255" value="2" required inputmode="numeric"> to recover</label>
+      </div>
+      <div class="plan" id="plan" role="status">
+        <div class="dots" id="plan-dots" aria-hidden="true"></div>
+        <p id="plan-text"></p>
+      </div>
+      <label class="check"><input type="checkbox" id="pad"> Hide the secret's length <span class="hint">(otherwise each share shows how long the secret is; shares get longer)</span></label>
     </div>
-    <label class="check"><input type="checkbox" id="pad"> Hide the secret's length <span class="hint">(shares get longer)</span></label>
+
     <p class="error" id="split-error" role="alert" hidden></p>
-    <button type="submit" class="primary">Split</button>
+    <button type="submit" class="primary">Split into shares</button>
   </form>
 
   <div id="split-result" hidden>
+    <p class="recap" id="split-recap">The secret is hidden. <button type="button" class="quiet" id="edit-split">Show it and change something</button></p>
     <h2 id="split-summary" tabindex="-1"></h2>
-    <p id="split-advice">Give each share to a different person or place. Then close this page: the secret is not stored anywhere.</p>
+    <ol class="todo" id="split-advice">
+      <li>Give each share to a different person or place.</li>
+      <li>Print gives each share its own sheet, with instructions for whoever has to use it one day.</li>
+      <li>Then choose Clear everything, or close this page. The page keeps nothing: once it is closed, only the shares remain.</li>
+    </ol>
     <div class="row">
+      <button type="button" id="print">Print, one share a sheet</button>
       <button type="button" id="download-all">Download all</button>
-      <button type="button" id="print">Print</button>
       <button type="button" class="quiet" id="clear-split">Clear everything</button>
     </div>
     <ol id="share-list"></ol>
@@ -152,25 +257,39 @@ details p { color: var(--muted); }
 
 <section role="tabpanel" id="panel-recover" aria-labelledby="tab-recover" hidden>
   <form id="recover-form" autocomplete="off">
-    <label for="shares-in">Shares</label>
-    <textarea id="shares-in" rows="6" spellcheck="false" autocapitalize="off" autocorrect="off" autocomplete="off" placeholder="Paste shares here, one per line, in any order. Shares from older versions of SecretSlices work too."></textarea>
-    <div class="row">
-      <label class="file">Add share files <input type="file" id="files" multiple accept=".txt,.json,text/plain,application/json"></label>
-      <span class="hint">or drop them on the box</span>
+    <div class="step">
+      <h2><span class="num" aria-hidden="true">1</span><label for="shares-in">Add your shares</label></h2>
+      <p class="hint" id="shares-help">Type or paste them here in any order, one per line. A share is a long line of letters and numbers; new ones begin with <code>ss1.</code></p>
+      <textarea id="shares-in" rows="6" spellcheck="false" autocapitalize="off" autocorrect="off" autocomplete="off" aria-describedby="shares-help" placeholder="ss1.…"></textarea>
+      <div class="row">
+        <label class="file">Add share files <input type="file" id="files" multiple accept=".txt,.json,text/plain,application/json"></label>
+        <span class="hint">or drop them on the box. Shares from older versions of SecretSlices work too.</span>
+      </div>
     </div>
-    <ul id="share-status" aria-live="polite"></ul>
+
+    <div class="step">
+      <h2><span class="num" aria-hidden="true">2</span>Check you have enough</h2>
+      <div class="meter" id="share-meter" aria-hidden="true" hidden></div>
+      <ul id="share-status" aria-live="polite"></ul>
+      <p class="next" id="recover-next" role="status"></p>
+    </div>
+
     <p class="error" id="recover-error" role="alert" hidden></p>
-    <button type="submit" class="primary">Recover</button>
+    <button type="submit" class="primary">Recover the secret</button>
   </form>
 
   <div id="recover-result" hidden>
     <h2 id="recover-summary" tabindex="-1"></h2>
     <p class="warning" id="recover-warning" hidden></p>
+    <ol class="words" id="recovered-words" hidden></ol>
     <pre id="recovered" class="secret"></pre>
     <div class="row">
       <button type="button" id="copy-secret">Copy</button>
+      <button type="button" id="toggle-secret" aria-pressed="false">Hide it</button>
+      <button type="button" class="quiet" id="edit-recover">Back to the shares</button>
       <button type="button" class="quiet" id="clear-recover">Clear everything</button>
     </div>
+    <p class="hint" id="recover-after">Write it down, or enter it where it is needed. Then choose Clear everything and close this page. The page keeps nothing once it is closed.</p>
     <form id="password-form" autocomplete="off" hidden>
       <p>This secret was encrypted with a password before it was split.</p>
       <label for="password">Password</label>
@@ -184,16 +303,17 @@ details p { color: var(--muted); }
 </section>
 </main>
 
+<p class="vh" id="say" role="status"></p>
+
 <footer id="about">
   <details>
     <summary>How it works, and what to trust</summary>
-    <p>SecretSlices uses <strong>Shamir's secret sharing</strong>. Each share is a point on a random curve whose shape is the secret. With the required number of points the curve is known; with even one fewer, every possible secret is exactly as likely as before. That is a mathematical property, not an encryption that could be broken later.</p>
-    <p><strong>Recovery is checked.</strong> A share that was mistyped is reported by its number. If the shares do not fit together (one was changed, or belongs to a different secret), you get an error, never a wrong secret.</p>
-    <p><strong>Nothing leaves this page.</strong> It is a single file with no outside resources, and its security policy forbids every network request, so even a bug could not send your secret anywhere. For the highest assurance, save this page, disconnect from the network, and open the saved file.</p>
+    <p>SecretSlices uses <strong>Shamir's secret sharing</strong>. Each share is a point on a random curve whose shape is the secret. With the required number of points the curve is known; with even one fewer, every possible secret of that length is exactly as likely as before. That is a mathematical property, not an encryption that could be broken later. The one thing a share does show is how long the secret is; tick <em>Hide the secret's length</em> to blur that too.</p>
+    <p><strong>Recovery is checked.</strong> A share that was mistyped is reported by its number. If the shares do not fit together (one was changed, or belongs to a different secret), you get an error, not a wrong secret. This applies to shares that start with <code>ss1.</code>; shares made by earlier versions of SecretSlices can still be recovered here, but they cannot be checked, and the page says so when it reads them.</p>
+    <p><strong>Nothing leaves this page.</strong> It is a single file with no outside resources, and its security policy forbids every network request, so even a bug could not send your secret anywhere. It saves nothing in your browser either. What you copy or download does go to your clipboard and your disk, and the secret is on your screen while you work, so use a device you trust. For the highest assurance, save this page, disconnect from the network, and open the saved file.</p>
     <p><strong>What it cannot do.</strong> Anyone holding the required number of shares can read the secret. Someone you give a share to can refuse to return it, so create more shares than you require. If one person hands you a complete set of shares, you are trusting that person: shares are not signed.</p>
-    <p>Shares made by earlier versions of SecretSlices can still be recovered here. New shares start with <code>ss1.</code></p>
   </details>
-  <p class="small">SecretSlices 1.0.0 · open source, MIT licence · <a href="https://github.com/codenlighten/secret_slice_sss" rel="noopener noreferrer">source and format specification</a></p>
+  <p class="small">SecretSlices 1.1.0 · open source, MIT licence · <a href="https://github.com/codenlighten/secret_slice_sss" rel="noopener noreferrer">source and format specification</a></p>
 </footer>
 
 <template id="share-template">
@@ -202,7 +322,17 @@ details p { color: var(--muted); }
       <strong class="share-title"></strong>
       <span class="share-note"></span>
     </div>
+    <p class="share-what sheet"></p>
     <code class="share-text"></code>
+    <div class="sheet">
+      <p class="sheet-title">To recover the secret</p>
+      <ol class="share-how">
+        <li>Bring together the number of shares named above. Any of them will do.</li>
+        <li>Open secretslices.com, or a saved copy of it, and choose <strong>Recover a secret</strong>.</li>
+        <li>Type each share on a line of its own, exactly as printed. The gaps only help you keep your place: with them or without, it works.</li>
+      </ol>
+      <p class="sheet-keep">Keep this sheet somewhere safe and private.</p>
+    </div>
     <div class="row share-actions">
       <button type="button" class="copy">Copy</button>
       <button type="button" class="download">Download</button>
@@ -566,7 +696,10 @@ function encodeShare({ threshold, index, setId, body }) {
  */
 function decodeShare(text) {
   if (typeof text !== 'string') fail('ERR_INVALID_SHARE', 'a share must be a string');
-  const trimmed = text.trim();
+  // Whitespace after the prefix carries no information: a share may be
+  // written in groups. The prefix itself must be intact.
+  const start = text.trim();
+  const trimmed = start.slice(0, PREFIX.length) + start.slice(PREFIX.length).replace(/\s+/g, '');
   if (!trimmed.startsWith(PREFIX)) {
     const other = /^ss(\d+)\./.exec(trimmed);
     if (other) {
@@ -769,6 +902,23 @@ __modules["src/input.js"] = (() => {
 
 const { fail } = __modules["src/errors.js"];
 
+// The index just past the JSON object that opens at `start`, or -1. Braces
+// inside strings do not count.
+function objectEnd(text, start) {
+  let depth = 0;
+  let inString = false;
+  for (let i = start; i < text.length; i++) {
+    const char = text[i];
+    if (inString) {
+      if (char === '\\') i++;
+      else if (char === '"') inString = false;
+    } else if (char === '"') inString = true;
+    else if (char === '{') depth++;
+    else if (char === '}' && --depth === 0) return i + 1;
+  }
+  return -1;
+}
+
 function fromText(text) {
   const trimmed = text.trim();
   if (trimmed === '') return [];
@@ -783,17 +933,38 @@ function fromText(text) {
   // pasted one after another) and bare shares, in any mixture. Everything in
   // the text must be accounted for; nothing is skipped.
   const items = [];
-  const bare = (segment) => items.push(...segment.split(/[\s,;"'[\]]+/).filter(Boolean));
+  // A share copied from paper is often typed with the gaps it was printed
+  // with, or wrapped over several lines. Every new-format share begins with
+  // "ss<version>.", and "." is not in the share alphabet, so a new share can
+  // only begin at such a prefix. Pieces after one that are made only of
+  // share characters are joined to it; if they were not in fact part of it,
+  // the share's checksum fails and the share is reported as damaged.
+  const bare = (segment) => {
+    let open = false;
+    for (const piece of segment.split(/[\s,;"'[\]]+/).filter(Boolean)) {
+      if (/^ss\d+\./.test(piece)) {
+        items.push(piece);
+        open = true;
+      } else if (open && /^[A-Za-z0-9_-]+$/.test(piece)) {
+        items[items.length - 1] += piece;
+      } else {
+        items.push(piece);
+        open = false;
+      }
+    }
+  };
   let position = 0;
-  for (const match of trimmed.matchAll(/\{[^{}]*\}/g)) {
-    bare(trimmed.slice(position, match.index));
+  for (let start = trimmed.indexOf('{'); start !== -1; start = trimmed.indexOf('{', position)) {
+    const end = objectEnd(trimmed, start);
+    bare(trimmed.slice(position, start));
     try {
-      items.push(...flatten(JSON.parse(match[0])));
+      if (end === -1) throw new SyntaxError('unterminated object');
+      items.push(...flatten(JSON.parse(trimmed.slice(start, end))));
     } catch (error) {
       if (!(error instanceof SyntaxError)) throw error;
       fail('ERR_INVALID_SHARE', 'the input contains JSON that could not be parsed');
     }
-    position = match.index + match[0].length;
+    position = end;
   }
   bare(trimmed.slice(position));
   return items;
@@ -1536,19 +1707,28 @@ const { generateMnemonic, validateMnemonic } = __modules["src/mnemonic.js"];
 const PAD_TO = 64;
 const $ = (id) => document.getElementById(id);
 const message = (error) => (error instanceof SecretSlicesError ? error.message : `Unexpected error: ${error?.message ?? error}`);
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 function show(element, text) {
   element.textContent = text ?? '';
   element.hidden = !text;
 }
 
-async function copy(text, button) {
+// Spoken by a screen reader without moving anything on the page.
+function say(text) {
+  $('say').textContent = '';
+  setTimeout(() => { $('say').textContent = text; }, 30);
+}
+
+async function copy(text, button, what) {
   const original = button.textContent;
   try {
     await navigator.clipboard.writeText(text);
     button.textContent = 'Copied';
+    say(`${what} copied.`);
   } catch {
     button.textContent = 'Select the text and copy it';
+    say('Copying is not available here. Select the text and copy it.');
   }
   setTimeout(() => { button.textContent = original; }, 1800);
 }
@@ -1562,6 +1742,16 @@ function download(name, text) {
   link.click();
   link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
+// Fills an element with one child per entry, each given a class or none.
+function marks(element, count, filled, className) {
+  element.replaceChildren();
+  for (let i = 0; i < count; i++) {
+    const mark = document.createElement('i');
+    if (i < filled) mark.className = className;
+    element.append(mark);
+  }
 }
 
 // ----------------------------------------------------------------------- tabs
@@ -1578,7 +1768,8 @@ function select(tab) {
 for (const tab of tabs) {
   tab.addEventListener('click', () => select(tab));
   tab.addEventListener('keydown', (event) => {
-    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
+    event.preventDefault();
     const next = tabs[(tabs.indexOf(tab) + 1) % tabs.length];
     select(next);
     next.focus();
@@ -1607,8 +1798,60 @@ function describeSecret() {
   }
 }
 
+// What the two numbers mean, said before anything is split: how many there
+// will be, how many it takes, how many can be lost, and when a choice leaves
+// no room for losing any.
+const MAX_DOTS = 24;
+const GROUP_UP_TO = 600;
+function describePlan() {
+  const shares = Number($('shares').value);
+  const threshold = Number($('threshold').value);
+  const sharesField = $('shares');
+  const thresholdField = $('threshold');
+  sharesField.setCustomValidity('');
+  thresholdField.setCustomValidity('');
+  for (const preset of document.querySelectorAll('.preset')) {
+    preset.setAttribute('aria-pressed', String(Number(preset.dataset.shares) === shares && Number(preset.dataset.threshold) === threshold));
+  }
+  const plan = $('plan');
+  const whole = (n) => Number.isInteger(n) && n >= 2 && n <= 255;
+  plan.className = 'plan';
+  if (!whole(shares) || !whole(threshold)) {
+    $('plan-dots').replaceChildren();
+    $('plan-text').textContent = 'Choose how many shares to make and how many it should take, each from 2 to 255.';
+    return;
+  }
+  if (threshold > shares) {
+    thresholdField.setCustomValidity(`You are making ${shares} shares, so at most ${shares} can be required.`);
+    $('plan-dots').replaceChildren();
+    $('plan-text').textContent = `You cannot require ${threshold} shares when only ${shares} are made. Make more, or require fewer.`;
+    plan.classList.add('risky');
+    return;
+  }
+  if (shares <= MAX_DOTS) marks($('plan-dots'), shares, threshold, 'need'); else $('plan-dots').replaceChildren();
+  const spare = shares - threshold;
+  $('plan-text').textContent = spare === 0
+    ? `${shares} shares will be made, and all ${shares} are needed to recover the secret. If even one is lost, the secret is lost. ${threshold - 1} or fewer reveal nothing.`
+    : `${shares} shares will be made. Any ${threshold} of them recover the secret, so ${spare === 1 ? 'one can be lost' : `${spare} can be lost`}. ${threshold - 1} or fewer reveal nothing.`;
+  if (spare === 0) plan.classList.add('risky');
+}
+
 function shareFileName(info, total) {
   return `secretslices-${info.setId.slice(0, 6)}-share-${info.index}-of-${total}.txt`;
+}
+
+// The share's text in groups of four. No whitespace is added between the
+// groups, so the element's text, and what is copied from it, is the share.
+function grouped(element, share) {
+  element.replaceChildren();
+  // A share long enough that nobody will type it is left whole: thousands of
+  // groups would cost more to draw than they could ever help.
+  if (share.length > GROUP_UP_TO) { element.textContent = share; return; }
+  for (let i = 0; i < share.length; i += 4) {
+    const group = document.createElement('span');
+    group.textContent = share.slice(i, i + 4);
+    element.append(group);
+  }
 }
 
 function clearSplit() {
@@ -1616,8 +1859,10 @@ function clearSplit() {
   $('secret').value = '';
   $('share-list').replaceChildren();
   $('split-result').hidden = true;
+  $('split-form').hidden = false;
   show($('split-error'));
   describeSecret();
+  describePlan();
 }
 
 $('secret').addEventListener('input', describeSecret);
@@ -1627,7 +1872,17 @@ $('generate').addEventListener('click', () => {
 });
 $('shares').addEventListener('input', () => {
   $('threshold').max = $('shares').value || 255;
+  describePlan();
 });
+$('threshold').addEventListener('input', describePlan);
+for (const preset of document.querySelectorAll('.preset')) {
+  preset.addEventListener('click', () => {
+    $('shares').value = preset.dataset.shares;
+    $('threshold').max = preset.dataset.shares;
+    $('threshold').value = preset.dataset.threshold;
+    describePlan();
+  });
+}
 
 $('split-form').addEventListener('submit', (event) => {
   event.preventDefault();
@@ -1645,6 +1900,7 @@ $('split-form').addEventListener('submit', (event) => {
     if (check !== secret) throw new Error('self-check failed; do not use these shares');
   } catch (error) {
     currentShares = [];
+    $('split-form').hidden = false;
     show($('split-error'), message(error));
     return;
   }
@@ -1656,16 +1912,26 @@ $('split-form').addEventListener('submit', (event) => {
     const item = $('share-template').content.firstElementChild.cloneNode(true);
     item.querySelector('.share-title').textContent = `Share ${info.index} of ${shares}`;
     item.querySelector('.share-note').textContent = `any ${threshold} recover the secret · set ${info.setId.slice(0, 6)} · secretslices.com`;
-    item.querySelector('.share-text').textContent = share;
-    item.querySelector('.copy').addEventListener('click', (e) => copy(share, e.currentTarget));
+    // Printed on the share's own sheet, for whoever holds it.
+    item.querySelector('.share-what').textContent = `This is one of ${shares} shares of a secret. Any ${threshold} of them, brought together, recover it. ${threshold - 1} or fewer reveal nothing.`;
+    grouped(item.querySelector('.share-text'), share);
+    item.querySelector('.copy').addEventListener('click', (e) => copy(share, e.currentTarget, `Share ${info.index}`));
     item.querySelector('.download').addEventListener('click', () => download(shareFileName(info, shares), `${share}\n`));
     list.append(item);
   });
   $('split-summary').textContent = `${shares} shares created. Any ${threshold} of them recover the secret; ${threshold - 1} or fewer reveal nothing. Checked: they work.`;
+  // The secret has done its work: it leaves the screen, and what is left is
+  // the shares and what to do with them.
+  $('split-form').hidden = true;
   $('split-result').hidden = false;
   $('split-summary').focus();
 });
 
+$('edit-split').addEventListener('click', () => {
+  $('split-form').hidden = false;
+  $('split-result').hidden = true;
+  $('secret').focus();
+});
 $('download-all').addEventListener('click', () => {
   currentShares.forEach((share, i) => {
     // Browsers block a burst of downloads; space them out.
@@ -1673,22 +1939,38 @@ $('download-all').addEventListener('click', () => {
   });
 });
 $('print').addEventListener('click', () => window.print());
-$('clear-split').addEventListener('click', clearSplit);
+$('clear-split').addEventListener('click', () => { const held = document.activeElement === $('clear-split'); clearSplit(); if (held) $('secret').focus(); });
 
 // -------------------------------------------------------------------- recover
 
+// What to do about one share that cannot be read, said after what is wrong
+// with it. A person recovering a secret may be doing it once in their life.
+const REPAIR = {
+  ERR_SHARE_CHECKSUM: 'Compare it with the original, one group at a time.',
+  ERR_INVALID_SHARE: 'Compare it with the original: a character is wrong, or part of it is missing.',
+  ERR_UNSUPPORTED_VERSION: 'It was made by a newer SecretSlices. Use the newest copy of this page.',
+};
+
 function describeShares() {
   const status = $('share-status');
+  const next = $('recover-next');
+  const meter = $('share-meter');
   status.replaceChildren();
+  meter.hidden = true;
+  next.className = 'next';
   show($('recover-error'));
   const text = $('shares-in').value;
-  if (text.trim() === '') return;
+  if (text.trim() === '') {
+    next.textContent = 'Nothing added yet. Each share you add is checked here as you go.';
+    return;
+  }
 
   let items;
   try {
     items = collectShares(text);
   } catch (error) {
     show($('recover-error'), message(error));
+    next.textContent = '';
     return;
   }
   const sets = new Map();
@@ -1698,10 +1980,14 @@ function describeShares() {
     if (className) item.className = className;
     status.append(item);
   };
+  let broken = 0;
+  let repair = '';
   items.forEach((item, i) => {
     const info = validate(item);
     if (!info.valid) {
       line(`Share ${i + 1}: ${info.message}`, 'bad');
+      broken += 1;
+      repair ||= `Line ${i + 1} is not a usable share. ${REPAIR[info.code] ?? REPAIR.ERR_INVALID_SHARE}`;
     } else if (info.format === 'ss1') {
       const set = sets.get(info.setId) ?? { threshold: info.threshold, indexes: new Set() };
       set.indexes.add(info.index);
@@ -1713,25 +1999,61 @@ function describeShares() {
     }
   });
   if (sets.size > 1) line('These shares come from different secrets and cannot be combined.', 'bad');
+  let ready = false;
+  let legacy = false;
+  let missing = 0;
   for (const [id, set] of sets) {
     const count = set.indexes.size;
     if (set.threshold === undefined) {
-      line(`${count} ${count === 1 ? 'share' : 'shares'} in an older SecretSlices format.`, count >= 2 ? 'ok' : '');
+      // Never marked as enough: an older share does not say how many are needed.
+      line(`${count} ${count === 1 ? 'share' : 'shares'} in an older SecretSlices format.`);
+      legacy = true;
     } else if (count >= set.threshold) {
       line(`${count} of the ${set.threshold} shares needed (set ${id.slice(0, 6)}). Ready to recover.`, 'ok');
+      ready = true;
     } else {
       line(`${count} of the ${set.threshold} shares needed (set ${id.slice(0, 6)}). Add ${set.threshold - count} more.`);
+      missing = set.threshold - count;
     }
+    if (sets.size === 1 && set.threshold !== undefined) {
+      marks(meter, set.threshold, Math.min(count, set.threshold), 'have');
+      meter.hidden = set.threshold > MAX_DOTS;
+      line(`Found: ${[...set.indexes].sort((a, b) => a - b).map((index) => `share ${index}`).join(', ')}.`);
+    }
+  }
+
+  // One instruction, the most useful one, said last.
+  if (sets.size > 1) {
+    next.textContent = 'Keep only the shares that belong together. Each share is printed with a short set code, and shares of the same secret have the same code.';
+    next.classList.add('fix');
+  } else if (broken > 0) {
+    next.textContent = repair;
+    next.classList.add('fix');
+  } else if (ready) {
+    next.textContent = 'You have enough. Choose Recover the secret.';
+    next.classList.add('ready');
+  } else if (missing > 0) {
+    next.textContent = `You need ${plural(missing, 'more share')}. Any of the other shares of this secret will do.`;
+  } else if (legacy) {
+    // An older share does not say how many are needed, so nothing here can
+    // promise that these are enough.
+    next.textContent = 'Older shares do not say how many are needed. Add every one you have, then choose Recover the secret.';
+  } else {
+    next.textContent = 'Add another share.';
   }
 }
 
 function clearRecover() {
   $('shares-in').value = '';
   $('recovered').textContent = '';
+  $('recovered-words').replaceChildren();
+  $('recovered-words').hidden = true;
   $('password').value = '';
   $('recover-result').hidden = true;
+  $('recover-form').hidden = false;
   $('password-form').hidden = true;
   show($('password-error'));
+  conceal(false);
   describeShares();
 }
 
@@ -1742,6 +2064,34 @@ async function addFiles(files) {
     box.value = box.value.trim() === '' ? text : `${box.value.trim()}\n${text}`;
   }
   describeShares();
+  say(`${plural(files.length, 'file')} added.`);
+}
+
+// Shows the recovered text. A recovery phrase is also laid out as numbered
+// words, which is how it has to be copied out or typed in somewhere else.
+function reveal(text) {
+  $('recovered').textContent = text;
+  const words = text.trim().split(/\s+/);
+  const list = $('recovered-words');
+  list.replaceChildren();
+  const phrase = [12, 15, 18, 21, 24].includes(words.length) && words.every((word) => /^[a-z]+$/.test(word)) && validateMnemonic(text.trim());
+  if (phrase) {
+    for (const word of words) {
+      const item = document.createElement('li');
+      item.textContent = word;
+      list.append(item);
+    }
+  }
+  list.hidden = !phrase;
+  conceal(false);
+}
+
+function conceal(hide) {
+  const button = $('toggle-secret');
+  button.setAttribute('aria-pressed', String(hide));
+  button.textContent = hide ? 'Show it' : 'Hide it';
+  $('recovered').hidden = hide;
+  $('recovered-words').hidden = hide || $('recovered-words').childElementCount === 0;
 }
 
 $('shares-in').addEventListener('input', describeShares);
@@ -1773,13 +2123,17 @@ $('recover-form').addEventListener('submit', (event) => {
     show($('recover-error'), error?.code === 'ERR_INVALID_UTF8' && result && !result.verified
       ? 'These shares do not produce a readable secret. At least one is wrong, or more are needed.'
       : message(error));
+    $('recover-form').hidden = false;
     return;
   }
-  $('recovered').textContent = text;
+  reveal(text);
   $('recover-summary').textContent = result.verified ? 'Secret recovered and verified' : 'Secret recovered';
   show($('recover-warning'), result.verified ? '' :
     'These shares are in an older format that cannot be verified. If the text below looks wrong, a share is incorrect or more shares are needed. Consider splitting the secret again to get verifiable shares.');
   $('password-form').hidden = !isPasswordEncrypted(text);
+  // The shares have done their work: what is left on screen is the secret
+  // and what to do with it.
+  $('recover-form').hidden = true;
   $('recover-result').hidden = false;
   $('recover-summary').focus();
 });
@@ -1788,7 +2142,7 @@ $('password-form').addEventListener('submit', async (event) => {
   event.preventDefault();
   show($('password-error'));
   try {
-    $('recovered').textContent = await decryptWithPassword($('recovered').textContent, $('password').value);
+    reveal(await decryptWithPassword($('recovered').textContent, $('password').value));
     $('recover-summary').textContent = 'Secret recovered and decrypted';
     $('password-form').hidden = true;
     $('password').value = '';
@@ -1797,8 +2151,14 @@ $('password-form').addEventListener('submit', async (event) => {
   }
 });
 
-$('copy-secret').addEventListener('click', (event) => copy($('recovered').textContent, event.currentTarget));
-$('clear-recover').addEventListener('click', clearRecover);
+$('copy-secret').addEventListener('click', (event) => copy($('recovered').textContent, event.currentTarget, 'Secret'));
+$('edit-recover').addEventListener('click', () => {
+  $('recover-form').hidden = false;
+  $('recover-result').hidden = true;
+  $('shares-in').focus();
+});
+$('toggle-secret').addEventListener('click', () => conceal($('toggle-secret').getAttribute('aria-pressed') !== 'true'));
+$('clear-recover').addEventListener('click', () => { const held = document.activeElement === $('clear-recover'); clearRecover(); if (held) $('shares-in').focus(); });
 
 // Start clean, even if the browser restored form fields from history.
 clearSplit();

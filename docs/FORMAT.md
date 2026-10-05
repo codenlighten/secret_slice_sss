@@ -11,8 +11,13 @@ a future incompatible format will use a different prefix (`ss2.`), and
 
 `base64url` is RFC 4648 section 5 without `=` padding. A decoder must reject
 characters outside the alphabet and a final character with non-zero unused
-bits, so every byte string has exactly one accepted spelling. Surrounding
-whitespace is ignored.
+bits, so every byte string has exactly one accepted spelling.
+
+Whitespace around the text form, and anywhere after the `ss1.` prefix, is
+ignored, so a share may be printed,
+and typed back in, in groups or over several lines. When several shares are
+read from one text, a new share begins at each `ss1.`; this is unambiguous
+because `.` is not in the base64url alphabet.
 
 ## Binary form
 

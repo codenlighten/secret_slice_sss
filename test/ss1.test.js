@@ -319,3 +319,31 @@ test('combineText refuses to return mangled text for a binary secret', () => {
   assert.throws(() => combineText(shares), code('ERR_INVALID_UTF8'));
   assert.deepEqual(combine(shares), Uint8Array.of(0xff, 0xfe, 0x00));
 });
+
+test('a share written in groups, or wrapped over lines, is the same share', () => {
+  const shares = split('typed back in from paper', { shares: 3, threshold: 2 });
+  const grouped = shares.map((share) => share.match(/.{1,4}/g).join(' '));
+  const wrapped = shares.map((share) => share.match(/.{1,17}/g).join('\n  '));
+  assert.equal(combineText([grouped[0], wrapped[2]]), 'typed back in from paper');
+  assert.equal(inspect(grouped[1]).index, 2);
+  assert.equal(validate(`\t${grouped[1]}\n`).valid, true);
+
+  // Several shares in one pasted text: a new share begins at each "ss1."
+  assert.equal(recover(grouped.slice(0, 2).join('\n')).text(), 'typed back in from paper');
+  assert.equal(recover(wrapped.slice(1).join('\n\n')).text(), 'typed back in from paper');
+  assert.equal(recover(`${grouped[0]} ${grouped[2]}`).text(), 'typed back in from paper', 'two on one line');
+  assert.equal(recover(`"${grouped[0]}",\n"${grouped[1]}"`).text(), 'typed back in from paper');
+  assert.equal(recover(shares.map((s) => s.replace('ss1.', 'ss1. ')).join('\n')).text(), 'typed back in from paper');
+
+  // The prefix itself must be intact, and every entry point agrees on that.
+  const brokenPrefix = shares[0].replace('ss1.', 's s1.');
+  assert.equal(validate(brokenPrefix).valid, false);
+  assert.throws(() => combineText([brokenPrefix, shares[1]]), SecretSlicesError);
+  assert.throws(() => recover([brokenPrefix, shares[1]]), SecretSlicesError);
+
+  // A wrong join is caught by the checksum, never silently accepted.
+  const missingGroup = grouped[0].split(' ').filter((_, i) => i !== 5).join(' ');
+  assert.throws(() => recover([missingGroup, shares[1]].join('\n')), SecretSlicesError);
+  assert.throws(() => recover(`${grouped[0]} stray ${shares[1]}`), SecretSlicesError);
+  assert.throws(() => recover(`${shares[0]}\nstray!\n${shares[1]}`), code('ERR_MIXED_SHARES'));
+});

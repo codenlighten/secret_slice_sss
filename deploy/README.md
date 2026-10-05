@@ -8,11 +8,16 @@ no API and no database; the 2024 Express app is not needed.
 1. Check out a release tag (never a branch) and confirm the file is the one
    the tests built:
 
-       git checkout v1.0.0
+       git checkout v1.1.0
        node scripts/build-web.mjs --check
        sha256sum web/index.html
 
-   For v1.0.0 the SHA-256 is `fa3bed21a5cc0948e8336b822672f888630de964ef3add44636b11ae6675e292`.
+   SHA-256 of `web/index.html` by release:
+
+   | tag | SHA-256 |
+   |---|---|
+   | v1.1.0 | `6ffee9268c13b91434cef268d45924eb423f80c460ce400597676aba5459613e` |
+   | v1.0.0 | `fa3bed21a5cc0948e8336b822672f888630de964ef3add44636b11ae6675e292` |
 
 2. Copy it to the web root as the only file:
 
@@ -26,7 +31,7 @@ no API and no database; the 2024 Express app is not needed.
 
 ## Checking a deployment
 
-    curl -s https://secretslices.com/ | sha256sum          # equals the value above
+    curl -s https://secretslices.com/ | sha256sum          # equals the value for the deployed tag
     curl -sI https://secretslices.com/ | grep -i -E 'strict-transport|frame-ancestors|x-frame|referrer'
     node scripts/browser-check.mjs https://secretslices.com/   # full end-to-end run in Chrome
 

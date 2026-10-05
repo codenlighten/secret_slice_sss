@@ -1,5 +1,33 @@
 # Changelog
 
+## 1.1.0
+
+### Web app
+
+- Redesigned around the person recovering a secret, possibly years later and
+  under stress. Two plain choices instead of tabs; numbered steps; a plan in
+  words before splitting ("Any 3 of them recover the secret, so 2 can be
+  lost"); presets for 2 of 3, 3 of 5 and 4 of 7.
+- Recovery shows a meter of shares found, and one next action at a time: how
+  many more are needed, which line is damaged and what to do about it.
+- The secret leaves the screen after a split. A recovered 12 to 24 word
+  phrase is laid out as numbered words; the secret can be hidden and shown.
+- Shares are displayed and printed in groups of four. Printing gives each
+  share its own sheet, with instructions for whoever holds it.
+- Larger touch targets, screen-reader announcements for copy and file
+  actions, a forced-colours style, one clear message when the threshold
+  exceeds the number of shares. Checked in Chromium, Firefox and WebKit.
+- The page's statements were tightened: older share formats are recovered but
+  not checked; a share shows the secret's length unless it is hidden; copies
+  and downloads go to the clipboard and disk.
+
+### Library and command line
+
+- Whitespace inside an `ss1` share is ignored, so a share typed back from
+  paper in groups, or wrapped over several lines, is read correctly by
+  `combine`, `recover`, `validate`, `inspect` and the command line. The share
+  format itself is unchanged.
+
 ## 1.0.0
 
 A complete rewrite. Nothing of the 0.0.1 code (SSSaaS/sssa-js) remains, but its

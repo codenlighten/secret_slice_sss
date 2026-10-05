@@ -53,7 +53,8 @@ A threshold of 1 is refused: every share would simply be the secret.
 ### `combine(shares)` → `Uint8Array`, `combineText(shares)` → `string`
 
 Takes at least `threshold` shares in any order. Extra shares and exact
-repeats are fine. Throws a `SecretSlicesError` if the result cannot be
+repeats are fine, and so is whitespace inside a share (one typed back from
+paper in groups, say). Throws a `SecretSlicesError` if the result cannot be
 verified.
 
 ### `recover(input)` → `{ secret, format, verified, text() }`
@@ -117,9 +118,9 @@ has the details.
 
 ## Web app
 
-[`web/index.html`](web/index.html) is the whole app in one file of about 80 kB: open it
+[`web/index.html`](web/index.html) is the whole app in one file of about 95 kB: open it
 from disk, or serve it from any static host. It generates recovery phrases,
-splits, prints and downloads shares, and recovers — including shares and
+splits, prints each share on its own sheet with instructions, and recovers — including shares and
 password-protected secrets from the 2024 secretslices.com.
 
 Its Content-Security-Policy is `default-src 'none'` with the exact script and
